@@ -1,5 +1,4 @@
-streamlit>=1.40
-anthropic>=0.40
-fastembed>=0.4
-numpy
+streamlit
+groq
 pypdf
+python-docx
