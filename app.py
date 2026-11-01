@@ -2,6 +2,7 @@ import streamlit as st
 from groq import Groq
 import pypdf
 import docx
+import io
 
 st.set_page_config(page_title="مساعد المستندات الذكي", page_icon="📚")
 st.title("📚 مساعد المستندات (RAG) - PDF & Word")
@@ -14,24 +15,34 @@ if "GROQ_API_KEY" not in st.secrets:
 api_key = st.secrets["GROQ_API_KEY"].strip()
 client = Groq(api_key=api_key)
 
-# 2. وظائف استخراج النصوص
+# 2. وظائف استخراج النصوص المحصنة
 def extract_text_from_pdf(file):
     text = ""
-    pdf_reader = pypdf.PdfReader(file)
-    for page in pdf_reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text + "\n"
+    try:
+        pdf_bytes = io.BytesIO(file.getvalue())
+        pdf_reader = pypdf.PdfReader(pdf_bytes)
+        for page in pdf_reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    except Exception as e:
+        st.error(f"خطأ في قراءة ملف PDF ({file.name}): {e}")
     return text
 
 def extract_text_from_docx(file):
-    doc = docx.Document(file)
-    full_text = [para.text for para in doc.paragraphs if para.text]
-    return "\n".join(full_text)
+    text = ""
+    try:
+        docx_bytes = io.BytesIO(file.getvalue())
+        doc = docx.Document(docx_bytes)
+        full_text = [para.text for para in doc.paragraphs if para.text]
+        text = "\n".join(full_text)
+    except Exception as e:
+        st.error(f"تعذر قراءة ملف Word ({file.name}). تأكد أنه بصيغة .docx وليس .doc القديمة.")
+    return text
 
 # 3. واجهة رفع الملفات (PDF و DOCX)
 uploaded_files = st.file_uploader(
-    "ارفع ملفاتك هنا (PDF أو Word)", 
+    "ارفع ملفاتك هنا (PDF أو Word بصيغة docx)", 
     type=["pdf", "docx"], 
     accept_multiple_files=True
 )
@@ -47,15 +58,13 @@ if uploaded_files:
     
     if extracted_text.strip():
         st.success("تم قراءة واستخراج النصوص من الملفات بنجاح!")
-    else:
-        st.warning("تعذر قراءة النصوص من الملفات المرفوعة، تأكد من أنها تحتوي على نص قابل للنسخ.")
 
 # 4. حقل السؤال والدردشة
 user_query = st.text_input("اطرح سؤالك حول المستندات:")
 
 if user_query:
     if not extracted_text.strip():
-        st.warning("يرجى رفع ملف PDF أو Word يحتوي على نص أولاً.")
+        st.warning("يرجى رفع ملف PDF أو Word بصيغة .docx يحتوي على نص أولاً.")
     else:
         with st.spinner("جاري تحليل السؤال والبحث في الملفات..."):
             system_prompt = f"""
@@ -65,10 +74,11 @@ if user_query:
 النص المستخرج من الملفات:
 {extracted_text[:12000]}
 """
-            # أحدث النماذج المتاحة والنشطة لدى Groq
+            # النماذج الرسمية النشطة لدى Groq
             models_to_try = [
                 "llama-3.1-8b-instant",
-                "llama-3.3-70b-versatile"
+                "llama-3.3-70b-versatile",
+                "mixtral-8x7b-32768"
             ]
 
             response = None
