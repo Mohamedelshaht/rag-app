@@ -42,14 +42,31 @@ if api_key:
                 {extracted_text[:12000]}
                 """
 
-                response = client.chat.completions.create(
-                    model="llama3-8b-8192",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_query}
-                    ],
-                    temperature=0.2,
-                )
+              # تجربة النماذج المتاحة لدى Groq تلقائياً لضمان عدم توقف التطبيق
+models_to_try = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "gemma2-9b-it"
+]
+
+response = None
+for model_name in models_to_try:
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_query}
+            ],
+            temperature=0.2,
+        )
+        break  # نجح الاستدعاء، اخرج من الحلقة
+    except Exception:
+        continue
+
+if response is None:
+    st.error("تعذر الاتصال بنماذج Groq حالياً، يرجى التحقق من مفتاح API Key.")
 
                 st.subheader("الإجابة:")
                 st.write(response.choices[0].message.content)
