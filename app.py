@@ -5,7 +5,7 @@ import pypdf
 st.set_page_config(page_title="مساعد المستندات الذكي", page_icon="📚")
 st.title("📚 مساعد المستندات (RAG) باستخدام Groq")
 
-# التحقق من وجود المفتاح وتنظيفه من أي مسافات مخفية
+# الاتصال بالمفتاح
 if "GROQ_API_KEY" not in st.secrets:
     st.error("مفتاح GROQ_API_KEY غير مكتوب في Secrets!")
     st.stop()
@@ -41,16 +41,34 @@ if user_query:
 النص المستخرج من الملفات:
 {extracted_text[:12000]}
 """
-            try:
-                response = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_query}
-                    ],
-                    temperature=0.2,
-                )
+            # التجربة المتتالية للنماذج المتاحة
+            models_to_try = [
+                "llama3-8b-8192",
+                "llama-3.1-8b-instant",
+                "llama3-70b-8192",
+                "mixtral-8x7b-32768",
+                "gemma2-9b-it"
+            ]
+
+            response = None
+            last_error = None
+            for model_name in models_to_try:
+                try:
+                    response = client.chat.completions.create(
+                        model=model_name,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_query}
+                        ],
+                        temperature=0.2,
+                    )
+                    break
+                except Exception as e:
+                    last_error = e
+                    continue
+
+            if response:
                 st.subheader("الإجابة:")
                 st.write(response.choices[0].message.content)
-            except Exception as e:
-                st.error(f"تفاصيل الخطأ الحقيقية من Groq:\n\n{e}")
+            else:
+                st.error(f"حدث خطأ أثناء الاتصال بالنماذج:\n\n{last_error}")
